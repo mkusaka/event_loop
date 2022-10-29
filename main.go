@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 )
@@ -16,14 +17,58 @@ func main() {
 
 		input.Scan()
 
-		addQueue(input.Text())
+		event := NewEvent(func(e *Event) {
+			e.start()
+			fmt.Println(input.Text())
+			rand.Seed(time.Now().UnixNano())
+			i := rand.Intn(2)
+			if i == 1 {
+				fmt.Println("random 1 == 1, end")
+				e.done()
+			} else {
+				fmt.Println("random 1 != 1")
+			}
+		})
+		addQueue(event)
 		fmt.Println("input is ", input.Text())
 	}
 }
 
-var queue []string
+type EventType = string
 
-func addQueue(task string) {
+const (
+	wait EventType = "wait"
+)
+
+type State = string
+
+const (
+	waiting State = "waiting"
+	running State = "running"
+	done    State = "done"
+)
+
+type Event struct {
+	eventType string
+	processor func(e *Event)
+	state     State
+}
+
+func NewEvent(processor func(e *Event)) *Event {
+	return &Event{eventType: wait, state: waiting, processor: processor}
+}
+
+func (e *Event) start() {
+	e.state = running
+}
+
+func (e *Event) done() {
+	e.state = done
+}
+
+var queue []*Event
+
+func addQueue(task *Event) {
 	queue = append(queue, task)
 }
 
@@ -34,10 +79,17 @@ func watchQueue() {
 	for {
 		if len(queue) != 0 {
 			popper := queue[0]
-			queue = queue[1:]
 
 			// task process
 			fmt.Println("dequeued", popper)
+			popper.processor(popper)
+
+			if popper.state == done {
+				fmt.Println("event is done.")
+				queue = queue[1:]
+			} else {
+				fmt.Printf("event is %s\n", popper.state)
+			}
 		}
 		time.Sleep(tick)
 	}
